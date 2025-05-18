@@ -702,7 +702,7 @@ namespace {namespace_name}_regs {{
             
             # Add static_assert for size validation
             f.write(f"static_assert(sizeof({safe_reg_name}_t) == {register.size}, "
-                    f"\"Size mismatch for {safe_reg_name}_t\");\n\n")
+                   f"\"Size mismatch for {safe_reg_name}_t\");\n\n")
     
     def _write_peripheral_struct(self, f, peripheral: Peripheral):
         """Write peripheral structure containing all registers."""
@@ -768,9 +768,9 @@ def main():
         description="Convert SVD files to C++ register interfaces",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  %(prog)s device.svd                    # Generate in ./generated/
-  %(prog)s device.svd -o my_output/      # Generate in ./my_output/
-  %(prog)s device.svd -v                 # Verbose output
+  %(prog)s device.svd                      # Generate in ./generated/
+  %(prog)s device.svd -o my_output/       # Generate in ./my_output/
+  %(prog)s device.svd -v                  # Verbose output
 """
     )
     parser.add_argument("svd_file", help="Path to SVD file")
