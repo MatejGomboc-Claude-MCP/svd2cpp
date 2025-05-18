@@ -2,14 +2,16 @@
 """
 Test script for SVD2CPP parser
 
-This script demonstrates the parser working with the example SVD file.
+This script demonstrates the parser working with the example SVD file
+and performs comprehensive validation of the generated C++ code.
 """
 
 import os
 import sys
 import subprocess
 import tempfile
-import difflib
+import textwrap
+import time
 
 def test_parser():
     """Test the SVD parser with the example file."""
@@ -33,8 +35,8 @@ def test_parser():
     # Create temporary output directory
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
-            # Run the parser with verbose output
-            print(f"Running parser on {example_svd}...")
+            # Test 1: Basic parsing with verbose output
+            print("Test 1: Basic SVD parsing...")
             result = subprocess.run([
                 sys.executable, parser_script, example_svd, "-o", temp_dir, "-v"
             ], capture_output=True, text=True)
@@ -45,14 +47,21 @@ def test_parser():
                 print(f"Stderr: {result.stderr}")
                 return False
             
-            print("Parser completed successfully!")
-            print(f"Parser output:")
-            print(result.stdout)
-            if result.stderr:
-                print(f"Parser warnings:")
-                print(result.stderr)
+            print("✓ Parser completed successfully")
             
-            # Check generated files
+            # Check parser output
+            if result.stdout:
+                print("Parser output:")
+                for line in result.stdout.strip().split('\n'):
+                    print(f"  {line}")
+            
+            if result.stderr:
+                print("Parser warnings:")
+                for line in result.stderr.strip().split('\n'):
+                    print(f"  {line}")
+            
+            # Test 2: Check generated files
+            print("\nTest 2: Validating generated files...")
             expected_files = ["gpio_regs.hpp", "uart_regs.hpp", "test_regs.hpp"]
             generated_files = []
             
@@ -62,151 +71,420 @@ def test_parser():
                     print(f"✓ Generated: {filename}")
                     generated_files.append(filepath)
                     
-                    # Show preview of generated file
-                    with open(filepath, 'r') as f:
-                        content = f.read()
-                        lines = content.split('\n')
-                        
-                    print(f"  Preview of {filename} ({len(lines)} lines):")
-                    
-                    # Show header and some content
-                    preview_lines = 20
-                    for i, line in enumerate(lines[:preview_lines]):
-                        print(f"    {i+1:3d}: {line}")
-                    
-                    if len(lines) > preview_lines:
-                        print(f"    ... ({len(lines) - preview_lines} more lines)")
-                    print()
+                    # Validate file content
+                    if not validate_file_content(filepath):
+                        print(f"✗ Content validation failed for {filename}")
+                        return False
                 else:
                     print(f"✗ Missing: {filename}")
                     return False
             
-            # Validate generated C++ syntax by trying to compile headers
+            # Test 3: Syntax validation
+            print("\nTest 3: C++ syntax validation...")
             if validate_cpp_syntax(generated_files):
-                print("✓ Generated C++ files have valid syntax")
+                print("✓ All generated files have valid C++ syntax")
             else:
-                print("⚠ Warning: Generated C++ may have syntax issues")
-                # Don't fail the test for syntax issues
+                print("⚠ Warning: Some syntax issues detected (but not fatal)")
+            
+            # Test 4: Content verification
+            print("\nTest 4: Content verification...")
+            if verify_generated_content(generated_files):
+                print("✓ Generated content verification passed")
+            else:
+                print("✗ Content verification failed")
+                return False
+            
+            # Test 5: Error handling
+            print("\nTest 5: Error handling tests...")
+            if test_error_handling(parser_script, temp_dir):
+                print("✓ Error handling tests passed")
+            else:
+                print("✗ Error handling tests failed")
+                return False
             
             return True
             
         except Exception as e:
-            print(f"Error running parser: {e}")
+            print(f"Error during testing: {e}")
             import traceback
             traceback.print_exc()
             return False
 
+def validate_file_content(filepath):
+    """Validate basic content of generated file."""
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Check for basic structure
+        if not content.strip():
+            print(f"  ✗ {os.path.basename(filepath)}: Empty file")
+            return False
+        
+        # Check for header guards
+        lines = content.split('\n')
+        has_ifndef = any('#ifndef' in line for line in lines[:10])
+        has_define = any('#define' in line for line in lines[:10])
+        has_endif = any('#endif' in line for line in lines[-10:])
+        
+        if not (has_ifndef and has_define and has_endif):
+            print(f"  ✗ {os.path.basename(filepath)}: Missing header guards")
+            return False
+        
+        # Check for namespace
+        if 'namespace ' not in content:
+            print(f"  ✗ {os.path.basename(filepath)}: Missing namespace")
+            return False
+        
+        # Check for union definitions
+        if 'union ' not in content:
+            print(f"  ⚠ {os.path.basename(filepath)}: No union definitions found")
+        
+        # Check for struct definitions
+        if 'struct ' not in content:
+            print(f"  ✗ {os.path.basename(filepath)}: Missing struct definitions")
+            return False
+        
+        # Check for volatile qualifiers
+        if 'volatile' not in content:
+            print(f"  ✗ {os.path.basename(filepath)}: Missing volatile qualifiers")
+            return False
+        
+        # Check for static_assert
+        if 'static_assert' not in content:
+            print(f"  ⚠ {os.path.basename(filepath)}: No static_assert statements found")
+        
+        print(f"  ✓ {os.path.basename(filepath)}: Basic content validation passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ✗ {os.path.basename(filepath)}: Error reading file: {e}")
+        return False
+
 def validate_cpp_syntax(file_paths):
     """Validate C++ syntax of generated files."""
-    for file_path in file_paths:
-        print(f"Validating C++ syntax for {os.path.basename(file_path)}...")
-        
-        # Try to find a C++ compiler
-        compilers = ['g++', 'clang++', 'c++']
-        compiler = None
-        
-        for comp in compilers:
-            try:
-                result = subprocess.run([comp, '--version'], 
-                                      capture_output=True, text=True)
-                if result.returncode == 0:
-                    compiler = comp
-                    break
-            except FileNotFoundError:
-                continue
-        
-        if not compiler:
-            print(f"  No C++ compiler found, skipping syntax validation")
+    # Try to find a C++ compiler
+    compilers = ['g++', 'clang++', 'c++']
+    compiler = None
+    
+    for comp in compilers:
+        try:
+            result = subprocess.run([comp, '--version'], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                compiler = comp
+                break
+        except (FileNotFoundError, subprocess.TimeoutExpired):
             continue
+    
+    if not compiler:
+        print("  No C++ compiler found, skipping syntax validation")
+        return True  # Don't fail if no compiler available
+    
+    print(f"  Using compiler: {compiler}")
+    
+    # Create a test source file that includes all headers
+    test_content = '#include <cstdint>\n\n'
+    for file_path in file_paths:
+        # Get the header filename for inclusion
+        header_name = os.path.basename(file_path)
+        test_content += f'#include "{header_name}"\n'
+    
+    test_content += '\nint main() { return 0; }\n'
+    
+    all_passed = True
+    
+    # Create temporary test file and try to compile
+    with tempfile.TemporaryDirectory() as test_dir:
+        # Copy headers to test directory
+        for file_path in file_paths:
+            import shutil
+            shutil.copy(file_path, test_dir)
         
-        # Create a simple test file that includes the generated header
-        test_cpp_content = f"""#include "{file_path}"
-
-int main() {{
-    return 0;
-}}
-"""
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.cpp', delete=False) as test_file:
-            test_file.write(test_cpp_content)
-            test_file_path = test_file.name
+        # Create test source file
+        test_cpp_path = os.path.join(test_dir, 'test.cpp')
+        with open(test_cpp_path, 'w') as f:
+            f.write(test_content)
         
         try:
             # Try to compile the test file
             result = subprocess.run([
-                compiler, '-c', '-std=c++11', '-Wall', '-Wextra', 
-                test_file_path, '-o', '/dev/null'
-            ], capture_output=True, text=True)
+                compiler, '-c', '-std=c++11', '-Wall', '-Wextra', '-Werror',
+                '-pedantic', test_cpp_path, '-o', os.path.join(test_dir, 'test.o')
+            ], capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0:
-                print(f"  ✓ Syntax validation passed")
+                print("  ✓ Compilation successful")
             else:
-                print(f"  ✗ Syntax validation failed:")
-                print(f"    {result.stderr}")
-                return False
-        finally:
-            os.unlink(test_file_path)
+                print("  ✗ Compilation failed:")
+                for line in result.stderr.split('\n'):
+                    if line.strip():
+                        print(f"    {line}")
+                all_passed = False
+                
+        except subprocess.TimeoutExpired:
+            print("  ⚠ Compilation timed out")
+            all_passed = False
+        except Exception as e:
+            print(f"  ✗ Compilation error: {e}")
+            all_passed = False
     
-    return True
+    return all_passed
+
+def verify_generated_content(file_paths):
+    """Verify specific content in generated files."""
+    
+    expected_content = {
+        'gpio_regs.hpp': [
+            'namespace gpio_regs',
+            'union MODE_t',
+            'union IDR_t', 
+            'union ODR_t',
+            'struct GPIO_regs_t',
+            'MODE0 : 2',
+            'ODR0 : 1',
+            'IDR0 : 1',
+            '#define GPIO_REGS'
+        ],
+        'uart_regs.hpp': [
+            'namespace uart_regs',
+            'union CR1_t',
+            'union SR_t',
+            'union DR_t',
+            'struct UART_regs_t',
+            'UE : 1',
+            'TC : 1',
+            'DR : 9',
+            '#define UART_REGS'
+        ],
+        'test_regs.hpp': [
+            'namespace test_regs',
+            'union CTRL8_t',
+            'union STATUS16_t',
+            'struct TEST_regs_t',
+            'uint8_t raw',
+            'uint16_t raw',
+            '#define TEST_REGS'
+        ]
+    }
+    
+    all_passed = True
+    
+    for file_path in file_paths:
+        filename = os.path.basename(file_path)
+        
+        if filename not in expected_content:
+            continue
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            missing_items = []
+            for expected_item in expected_content[filename]:
+                if expected_item not in content:
+                    missing_items.append(expected_item)
+            
+            if missing_items:
+                print(f"  ✗ {filename}: Missing expected content:")
+                for item in missing_items:
+                    print(f"    - {item}")
+                all_passed = False
+            else:
+                print(f"  ✓ {filename}: All expected content found")
+                
+        except Exception as e:
+            print(f"  ✗ {filename}: Error verifying content: {e}")
+            all_passed = False
+    
+    return all_passed
+
+def test_error_handling(parser_script, output_dir):
+    """Test error handling with invalid inputs."""
+    
+    test_cases = [
+        {
+            'name': 'Non-existent file',
+            'args': ['non_existent_file.svd'],
+            'expect_failure': True
+        },
+        {
+            'name': 'Invalid XML file',
+            'content': '<invalid xml>',
+            'expect_failure': True
+        },
+        {
+            'name': 'Empty SVD file',
+            'content': '<?xml version="1.0" encoding="utf-8"?><device></device>',
+            'expect_failure': False,  # Should handle gracefully
+        },
+        {
+            'name': 'SVD with no peripherals',
+            'content': '''<?xml version="1.0" encoding="utf-8"?>
+                <device>
+                    <vendor>Test</vendor>
+                    <n>TEST</n>
+                    <peripherals></peripherals>
+                </device>''',
+            'expect_failure': False,  # Should handle gracefully
+        }
+    ]
+    
+    all_passed = True
+    
+    with tempfile.TemporaryDirectory() as test_dir:
+        for i, test_case in enumerate(test_cases):
+            test_name = test_case['name']
+            print(f"  Testing: {test_name}")
+            
+            if 'content' in test_case:
+                # Create temporary SVD file
+                test_svd = os.path.join(test_dir, f'test_{i}.svd')
+                with open(test_svd, 'w') as f:
+                    f.write(textwrap.dedent(test_case['content']))
+                test_args = [test_svd, '-o', output_dir]
+            else:
+                test_args = test_case['args'] + ['-o', output_dir]
+            
+            try:
+                result = subprocess.run([
+                    sys.executable, parser_script] + test_args,
+                    capture_output=True, text=True, timeout=10)
+                
+                if test_case['expect_failure']:
+                    if result.returncode == 0:
+                        print(f"    ✗ Expected failure but parser succeeded")
+                        all_passed = False
+                    else:
+                        print(f"    ✓ Failed as expected (return code: {result.returncode})")
+                else:
+                    if result.returncode != 0:
+                        print(f"    ✗ Unexpected failure (return code: {result.returncode})")
+                        print(f"      stderr: {result.stderr}")
+                        all_passed = False
+                    else:
+                        print(f"    ✓ Handled gracefully")
+                        
+            except subprocess.TimeoutExpired:
+                print(f"    ✗ Parser timed out")
+                all_passed = False
+            except Exception as e:
+                print(f"    ✗ Test error: {e}")
+                all_passed = False
+    
+    return all_passed
 
 def show_example_usage():
     """Show example usage of the generated headers."""
-    print("\n" + "="*60)
+    print("\n" + "="*70)
     print("EXAMPLE USAGE OF GENERATED HEADERS")
-    print("="*60)
+    print("="*70)
     
     example_code = '''
+// Include the generated headers
 #include "gpio_regs.hpp"
 #include "uart_regs.hpp"
+#include "test_regs.hpp"
 
-void example_usage() {
-    // Configure GPIO pins as outputs
-    GPIO_REGS->MODE.bits.MODE0 = 0b01;  // Output mode
-    GPIO_REGS->MODE.bits.MODE1 = 0b01;  // Output mode
-    GPIO_REGS->MODE.bits.MODE2 = 0b00;  // Input mode
-    GPIO_REGS->MODE.bits.MODE3 = 0b00;  // Input mode
+void configure_peripherals() {
+    // GPIO Configuration
+    GPIO_REGS->MODE.bits.MODE0 = 0b01;  // Pin 0 as output
+    GPIO_REGS->MODE.bits.MODE1 = 0b01;  // Pin 1 as output
+    GPIO_REGS->MODE.bits.MODE2 = 0b00;  // Pin 2 as input
+    GPIO_REGS->MODE.bits.MODE3 = 0b00;  // Pin 3 as input
     
-    // Set output pins
+    // Set GPIO outputs
     GPIO_REGS->ODR.bits.ODR0 = 1;  // Set pin 0 high
     GPIO_REGS->ODR.bits.ODR1 = 0;  // Set pin 1 low
     
-    // Read input pins
+    // Read GPIO inputs
     bool pin2_state = GPIO_REGS->IDR.bits.IDR2;
     bool pin3_state = GPIO_REGS->IDR.bits.IDR3;
     
-    // Configure UART
+    // UART Configuration
     UART_REGS->CR1.bits.UE = 1;   // Enable UART
     UART_REGS->CR1.bits.TE = 1;   // Enable transmitter
     UART_REGS->CR1.bits.RE = 1;   // Enable receiver
+    UART_REGS->CR1.bits.M = 0;    // 8-bit word length
+    UART_REGS->CR1.bits.PCE = 0;  // No parity control
     
-    // Check UART status
-    if (UART_REGS->SR.bits.TXE) {
-        // Transmit buffer empty, can send data
-        UART_REGS->DR.bits.DR = 0x55;  // Send data
+    // Send data via UART
+    while (!UART_REGS->SR.bits.TXE)  // Wait for TX empty
+        ;
+    UART_REGS->DR.bits.DR = 0x55;     // Send data byte
+    
+    // Check for UART errors
+    if (UART_REGS->SR.bits.ORE) {
+        // Handle overrun error
     }
     
-    // Raw register access also available
-    uint32_t gpio_mode = GPIO_REGS->MODE.raw;
-    UART_REGS->CR1.raw = 0x200C;  // Set multiple bits at once
+    // Test peripheral with different register sizes
+    TEST_REGS->CTRL8.bits.EN = 1;      // 8-bit register
+    TEST_REGS->STATUS16.bits.READY = 1; // 16-bit register
+    
+    // Using raw register access
+    uint32_t mode_value = GPIO_REGS->MODE.raw;
+    UART_REGS->CR1.raw = 0x200C;  // Set multiple bits atomically
+    
+    // Register unions provide both structured and raw access
+    static_assert(sizeof(GPIO_REGS->MODE) == 4, "Register size check");
+    static_assert(sizeof(TEST_REGS->CTRL8) == 1, "8-bit register check");
+}
+
+// Interrupt handler example
+extern "C" void UART_IRQHandler() {
+    if (UART_REGS->SR.bits.RXNE) {
+        // Data received
+        uint16_t data = UART_REGS->DR.bits.DR;
+        // Process received data...
+    }
+    
+    if (UART_REGS->SR.bits.TC) {
+        // Transmission complete
+        // Handle completion...
+    }
 }
 '''
     
     for line in example_code.strip().split('\n'):
         print(f"  {line}")
     
-    print("\n" + "="*60)
+    print("\n" + "="*70)
+    print("KEY FEATURES DEMONSTRATED:")
+    print("✓ Type-safe bit field access (e.g., .bits.MODE0)")
+    print("✓ Raw register access (e.g., .raw)")
+    print("✓ Volatile memory-mapped pointers")
+    print("✓ Static size assertions")
+    print("✓ Multiple register sizes (8, 16, 32-bit)")
+    print("✓ Automatic padding and alignment")
+    print("✓ Clean namespace organization")
+    print("="*70)
+
+def show_performance_info():
+    """Show performance information about the parser."""
+    print("\nPERFORMANCE INFORMATION:")
+    print("- Single-pass XML parsing")
+    print("- Minimal memory footprint")
+    print("- Fast generation (typically <1s for small-medium SVD files)")
+    print("- Efficient duplicate detection")
+    print("- Comprehensive validation with early error detection")
 
 def main():
     """Main function."""
-    print("SVD2CPP Parser Test Suite")
-    print("========================")
+    print("SVD2CPP Parser Comprehensive Test Suite")
+    print("======================================")
     print()
     
+    start_time = time.time()
     success = test_parser()
+    end_time = time.time()
+    
+    print(f"\nTest execution time: {end_time - start_time:.2f} seconds")
     
     if success:
-        print("✓ All tests passed!")
+        print("\n🎉 ALL TESTS PASSED! 🎉")
         show_example_usage()
+        show_performance_info()
         print("\nTo use the parser with your own SVD files:")
         print("  python3 svd2cpp.py your_device.svd")
         print("  python3 svd2cpp.py your_device.svd -o output_dir -v")
@@ -214,11 +492,13 @@ def main():
         print("  python3 svd2cpp.py --help")
         sys.exit(0)
     else:
-        print("✗ Tests failed!")
-        print("\nTroubleshooting:")
-        print("- Check that the SVD file is valid XML")
-        print("- Ensure the parser has proper permissions")
-        print("- Try running with -v flag for verbose output")
+        print("\n❌ SOME TESTS FAILED ❌")
+        print("\nTroubleshooting tips:")
+        print("- Verify SVD file format is valid XML")
+        print("- Check that peripherals have required elements")
+        print("- Ensure write permissions for output directory")
+        print("- Try running with -v flag for detailed output")
+        print("- Check for duplicate register/field names")
         sys.exit(1)
 
 if __name__ == "__main__":
