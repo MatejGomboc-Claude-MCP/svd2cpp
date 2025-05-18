@@ -268,5 +268,113 @@
         </register>
       </registers>
     </peripheral>
+
+    <!-- Test peripheral with edge cases -->
+    <peripheral>
+      <name>TEST</name>
+      <description>Test peripheral with edge cases</description>
+      <baseAddress>0x50000000</baseAddress>
+      <registers>
+        <!-- 8-bit register -->
+        <register>
+          <name>CTRL8</name>
+          <description>8-bit control register</description>
+          <addressOffset>0x00</addressOffset>
+          <size>8</size>
+          <resetValue>0x0F</resetValue>
+          <fields>
+            <field>
+              <name>EN</name>
+              <description>Enable bit</description>
+              <bitOffset>0</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+            <field>
+              <name>MODE</name>
+              <description>Mode selection</description>
+              <bitOffset>1</bitOffset>
+              <bitWidth>3</bitWidth>
+            </field>
+          </fields>
+        </register>
+        
+        <!-- 16-bit register -->
+        <register>
+          <name>STATUS16</name>
+          <description>16-bit status register</description>
+          <addressOffset>0x02</addressOffset>
+          <size>16</size>
+          <resetValue>0x8000</resetValue>
+          <fields>
+            <field>
+              <name>READY</name>
+              <description>Ready flag</description>
+              <bitOffset>15</bitOffset>
+              <bitWidth>1</bitWidth>
+              <access>read-only</access>
+            </field>
+            <field>
+              <name>ERROR</name>
+              <description>Error flags</description>
+              <bitOffset>8</bitOffset>
+              <bitWidth>8</bitWidth>
+              <access>read-only</access>
+            </field>
+          </fields>
+        </register>
+        
+        <!-- Register with special characters in names (will be sanitized) -->
+        <register>
+          <name>REG-WITH-DASHES</name>
+          <description>Register with dashes in name</description>
+          <addressOffset>0x10</addressOffset>
+          <size>32</size>
+          <fields>
+            <field>
+              <name>FIELD.WITH.DOTS</name>
+              <description>Field with dots</description>
+              <bitOffset>0</bitOffset>
+              <bitWidth>8</bitWidth>
+            </field>
+            <field>
+              <name>123STARTS_WITH_NUMBER</name>
+              <description>Field starting with number</description>
+              <bitOffset>8</bitOffset>
+              <bitWidth>8</bitWidth>
+            </field>
+          </fields>
+        </register>
+        
+        <!-- Register with gap between fields -->
+        <register>
+          <name>SPARSE</name>
+          <description>Register with sparse bit fields</description>
+          <addressOffset>0x20</addressOffset>
+          <size>32</size>
+          <fields>
+            <field>
+              <name>FIELD1</name>
+              <description>First field</description>
+              <bitOffset>0</bitOffset>
+              <bitWidth>4</bitWidth>
+            </field>
+            <!-- Gap from bit 4 to 15 -->
+            <field>
+              <name>FIELD2</name>
+              <description>Second field</description>
+              <bitOffset>16</bitOffset>
+              <bitWidth>8</bitWidth>
+            </field>
+            <!-- Gap from bit 24 to 30 -->
+            <field>
+              <name>FIELD3</name>
+              <description>Third field</description>
+              <bitOffset>31</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+          </fields>
+        </register>
+      </registers>
+    </peripheral>
   </peripherals>
 </device>
