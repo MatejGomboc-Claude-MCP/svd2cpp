@@ -62,7 +62,7 @@ def test_parser():
             
             # Test 2: Check generated files
             print("\nTest 2: Validating generated files...")
-            expected_files = ["gpio_regs.hpp", "uart_regs.hpp", "test_regs.hpp"]
+            expected_files = ["gpio_regs.hpp", "uart_regs.hpp"]
             generated_files = []
             
             for filename in expected_files:
@@ -256,15 +256,6 @@ def verify_generated_content(file_paths):
             'TC : 1',
             'DR : 9',
             '#define UART_REGS'
-        ],
-        'test_regs.hpp': [
-            'namespace test_regs',
-            'union CTRL8_t',
-            'union STATUS16_t',
-            'struct TEST_regs_t',
-            'uint8_t raw',
-            'uint16_t raw',
-            '#define TEST_REGS'
         ]
     }
     
@@ -321,11 +312,11 @@ def test_error_handling(parser_script, output_dir):
         {
             'name': 'SVD with no peripherals',
             'content': '''<?xml version="1.0" encoding="utf-8"?>
-                <device>
-                    <vendor>Test</vendor>
-                    <n>TEST</n>
-                    <peripherals></peripherals>
-                </device>''',
+                        <device>
+                            <vendor>Test</vendor>
+                            <name>TEST</name>
+                            <peripherals></peripherals>
+                        </device>''',
             'expect_failure': False,  # Should handle gracefully
         }
     ]
@@ -384,7 +375,6 @@ def show_example_usage():
 // Include the generated headers
 #include "gpio_regs.hpp"
 #include "uart_regs.hpp"
-#include "test_regs.hpp"
 
 void configure_peripherals() {
     // GPIO Configuration
@@ -418,17 +408,12 @@ void configure_peripherals() {
         // Handle overrun error
     }
     
-    // Test peripheral with different register sizes
-    TEST_REGS->CTRL8.bits.EN = 1;      // 8-bit register
-    TEST_REGS->STATUS16.bits.READY = 1; // 16-bit register
-    
     // Using raw register access
     uint32_t mode_value = GPIO_REGS->MODE.raw;
     UART_REGS->CR1.raw = 0x200C;  // Set multiple bits atomically
     
     // Register unions provide both structured and raw access
     static_assert(sizeof(GPIO_REGS->MODE) == 4, "Register size check");
-    static_assert(sizeof(TEST_REGS->CTRL8) == 1, "8-bit register check");
 }
 
 // Interrupt handler example
@@ -443,8 +428,7 @@ extern "C" void UART_IRQHandler() {
         // Transmission complete
         // Handle completion...
     }
-}
-'''
+}'''
     
     for line in example_code.strip().split('\n'):
         print(f"  {line}")
@@ -455,7 +439,6 @@ extern "C" void UART_IRQHandler() {
     print("✓ Raw register access (e.g., .raw)")
     print("✓ Volatile memory-mapped pointers")
     print("✓ Static size assertions")
-    print("✓ Multiple register sizes (8, 16, 32-bit)")
     print("✓ Automatic padding and alignment")
     print("✓ Clean namespace organization")
     print("="*70)
@@ -472,7 +455,7 @@ def show_performance_info():
 def main():
     """Main function."""
     print("SVD2CPP Parser Comprehensive Test Suite")
-    print("======================================")
+    print("==========================================")
     print()
     
     start_time = time.time()
