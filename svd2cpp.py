@@ -153,7 +153,7 @@ class SVDParser:
         if not description:
             return ""
         # Remove XML tags
-        description = re.sub(r'<[^>]+>', '', description)
+        description = re.sub(r'<[^>]+>', ' ', description)
         # Handle common escape sequences
         description = description.replace('&lt;', '<').replace('&gt;', '>')
         description = description.replace('&amp;', '&').replace('&quot;', '"')
@@ -645,7 +645,8 @@ namespace {namespace_name}_regs {{
  * @details Offset: 0x{register.address_offset:04X}, Size: {register.size} bytes ({register.size_bits} bits)
  * @details Reset value: 0x{register.reset_value:0{register.size*2}X}
  * @details Access: {register.access}
- */\n""")
+ */
+""")
             
             # Write register union
             f.write(f"union {safe_reg_name}_t {{\n")
@@ -701,7 +702,7 @@ namespace {namespace_name}_regs {{
             
             # Add static_assert for size validation
             f.write(f"static_assert(sizeof({safe_reg_name}_t) == {register.size}, "
-                   f"\"Size mismatch for {safe_reg_name}_t\");\n\n")
+                    f"\"Size mismatch for {safe_reg_name}_t\");\n\n")
     
     def _write_peripheral_struct(self, f, peripheral: Peripheral):
         """Write peripheral structure containing all registers."""
@@ -741,7 +742,7 @@ struct {safe_peripheral_name}_regs_t {{
         
         # Add static assert for minimum size (actual size may be larger due to alignment)
         f.write(f"static_assert(sizeof({safe_peripheral_name}_regs_t) >= {current_offset}, "
-               f"\"Size mismatch for {safe_peripheral_name}_regs_t\");\n\n")
+                f"\"Size mismatch for {safe_peripheral_name}_regs_t\");\n\n")
         
         # Add memory-mapped pointer with proper volatile qualifier
         f.write(f"""// Memory-mapped peripheral instance
@@ -767,9 +768,9 @@ def main():
         description="Convert SVD files to C++ register interfaces",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  %(prog)s device.svd                     # Generate in ./generated/
-  %(prog)s device.svd -o my_output/       # Generate in ./my_output/
-  %(prog)s device.svd -v                  # Verbose output
+  %(prog)s device.svd                    # Generate in ./generated/
+  %(prog)s device.svd -o my_output/      # Generate in ./my_output/
+  %(prog)s device.svd -v                 # Verbose output
 """
     )
     parser.add_argument("svd_file", help="Path to SVD file")
