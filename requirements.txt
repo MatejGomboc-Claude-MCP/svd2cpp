@@ -1,0 +1,8 @@
+# SVD2CPP has no external dependencies
+# Python 3.6+ with standard library only
+
+# For development and testing:
+# pytest>=6.0.0
+# pytest-cov>=2.10.0
+# flake8>=3.8.0
+# black>=21.0.0
